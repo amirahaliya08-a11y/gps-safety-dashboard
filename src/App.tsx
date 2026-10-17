@@ -309,18 +309,18 @@ export default function App() {
     : null;
   const coordinates = gps && hasGpsFix
     ? `${gps.latitude.toFixed(4)}°, ${gps.longitude.toFixed(4)}°`
-    : isDeviceConnected ? 'Waiting for GPS fix' : 'Live location not started';
+    : isDeviceConnected ? 'Waiting for GPS fix' : browserLocationWatching ? 'Waiting for location fix' : 'Live location not started';
   const fallStatus = isDeviceConnected
     ? telemetry?.fallDetected === undefined
       ? 'Waiting for fall status'
       : isAlertActive ? 'Fall detected' : 'No fall detected'
-    : 'Waiting for live device data';
+    : 'Waiting for device data';
   const gpsStatus = isDeviceConnected
     ? gps === undefined ? 'Not reported' : hasGpsFix ? 'GPS fix' : 'No fix'
     : browserLocation ? 'Browser location fix' : browserLocationWatching ? 'Waiting for location fix' : 'Not started';
   const motionStatus = isDeviceConnected
     ? hasMotionData ? 'Motion data received' : 'Not reported'
-    : 'Waiting for live device data';
+    : 'Not connected';
 
   useEffect(() => {
     if (isAlertActive) {
@@ -377,6 +377,7 @@ export default function App() {
     { label: 'GPS', value: gpsStatus, tone: '#8b5cf6', icon: '📍' },
     { label: 'Motion', value: motionStatus, tone: '#f59e0b', icon: '⚡' },
   ];
+  const incidentTimeline = notifications.slice(0, 3);
 
   return (
     <div data-theme={isDarkMode ? 'dark' : 'light'} style={{ minHeight: '100vh', background: isDarkMode ? 'radial-gradient(circle at top, #111827 0%, #020817 45%, #020617 100%)' : 'linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)', color: isDarkMode ? '#e2e8f0' : '#0f172a', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '3rem' }}>
@@ -434,7 +435,7 @@ export default function App() {
               <div style={{ background: isDarkMode ? '#0f172a' : '#f8fafc', border: isDarkMode ? '1px solid rgba(148,163,184,0.12)' : '1px solid #e2e8f0', borderRadius: '14px', padding: '12px' }}>
                 <div style={{ fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>Fall detection</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
-                  <span style={{ fontWeight: 700 }}>{isAlertActive ? 'Fall detected' : isDeviceConnected && telemetry?.fallDetected === false ? 'No fall reported' : 'Waiting for live data'}</span>
+                  <span style={{ fontWeight: 700 }}>{isAlertActive ? 'Fall detected' : isDeviceConnected && telemetry?.fallDetected === false ? 'No fall reported' : 'Waiting for device data'}</span>
                   <span style={{ color: isAlertActive ? '#ef4444' : isDeviceConnected && telemetry?.fallDetected === false ? '#10b981' : '#64748b', fontWeight: 800 }}>{isAlertActive ? 'Alert' : isDeviceConnected && telemetry?.fallDetected === false ? 'Clear' : 'Unknown'}</span>
                 </div>
                 <p style={{ margin: '9px 0 0', color: isDarkMode ? '#cbd5e1' : '#64748b', fontSize: '11px', lineHeight: 1.5 }}>
@@ -451,7 +452,7 @@ export default function App() {
               <div style={{ background: isDarkMode ? '#0f172a' : '#f8fafc', border: isDarkMode ? '1px solid rgba(148,163,184,0.12)' : '1px solid #e2e8f0', borderRadius: '14px', padding: '12px' }}>
                 <div style={{ fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>Emergency contacts</div>
                 <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
-                  {['Primary contact', 'Clinic contact', 'Backup contact'].map(contact => (
+                  {['Primary contact', 'Backup contact'].map(contact => (
                     <div key={contact} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '8px 10px', borderRadius: '10px', background: isDarkMode ? '#111827' : '#ffffff', border: isDarkMode ? '1px solid rgba(148,163,184,0.12)' : '1px solid #e5e7eb', fontSize: '11px' }}>
                       <span style={{ fontWeight: 700 }}>{contact}</span>
                       <span style={{ color: isDarkMode ? '#cbd5e1' : '#64748b' }}>Not configured</span>
@@ -510,10 +511,10 @@ export default function App() {
                         <span style={{ fontSize: '18px' }}>🕒</span>
                       </div>
                       <div style={{ display: 'grid', gap: '8px' }}>
-                        {notifications.length > 0
-                          ? notifications.slice(0, 3).map(item => (
+                        {incidentTimeline.length > 0
+                          ? incidentTimeline.map(item => (
                             <div key={item.id} style={{ display: 'flex', gap: '12px', padding: '10px 12px', borderRadius: '12px', background: isDarkMode ? '#111827' : '#ffffff', border: isDarkMode ? '1px solid rgba(148,163,184,0.12)' : '1px solid #e5e7eb' }}>
-                              <div style={{ width: '42px', fontSize: '11px', fontWeight: 800, color: item.type === 'alert' ? '#ef4444' : '#b45309' }}>{item.time}</div>
+                              <div style={{ width: '42px', fontSize: '11px', fontWeight: 800, color: 'type' in item && item.type === 'alert' ? '#ef4444' : '#b45309' }}>{item.time}</div>
                               <div style={{ flex: 1 }}>
                                 <div style={{ fontSize: '12px', fontWeight: 700 }}>{item.title}</div>
                                 <div style={{ fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#64748b', marginTop: '2px' }}>{item.detail}</div>
@@ -559,8 +560,8 @@ export default function App() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: isDeviceConnected && telemetry?.fallDetected === false ? '#d1fae5' : '#e0e7ff', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '20px' }}>🛡️</div>
                       <div>
-                        <div style={{ fontWeight: 800, color: isDeviceConnected && telemetry?.fallDetected === false ? '#065f46' : isDarkMode ? '#e2e8f0' : '#312e81' }}>{isDeviceConnected && telemetry?.fallDetected === false ? 'No fall detected' : 'Waiting for live device data'}</div>
-                        <div style={{ fontSize: '12px', color: isDeviceConnected && telemetry?.fallDetected === false ? '#047857' : isDarkMode ? '#cbd5e1' : '#4338ca' }}>{isDeviceConnected && telemetry?.fallDetected === false ? 'The connected device currently reports no fall.' : isDeviceConnected ? 'Connected, but no fall-detection reading has arrived yet.' : 'Connect the ESP32 to receive live fall-detection readings.'}</div>
+                        <div style={{ fontWeight: 800, color: isDeviceConnected && telemetry?.fallDetected === false ? '#065f46' : isDarkMode ? '#e2e8f0' : '#312e81' }}>{isDeviceConnected && telemetry?.fallDetected === false ? 'No fall detected' : 'Waiting for device data'}</div>
+                        <div style={{ fontSize: '12px', color: isDeviceConnected && telemetry?.fallDetected === false ? '#047857' : isDarkMode ? '#cbd5e1' : '#4338ca' }}>{isDeviceConnected && telemetry?.fallDetected === false ? 'The connected device currently reports no fall.' : isDeviceConnected ? 'Connected, but no fall-detection reading has arrived yet.' : 'Connect the ESP32 to receive fall-detection readings.'}</div>
                       </div>
                     </div>
                   </div>
@@ -602,7 +603,7 @@ export default function App() {
                       <div style={{ width: '60px', height: '60px', background: '#4f46e5', color: '#fff', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.4)', marginBottom: '12px' }}>🛰️</div>
                       <h4 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>{hasGpsFix ? 'Live location coordinates' : 'Waiting for a live location fix'}</h4>
                       <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#4f46e5', fontWeight: 700, fontFamily: 'monospace' }}>{coordinates}</p>
-                      <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>{isDeviceConnected ? (hasGpsFix ? 'Location supplied by live ESP32 telemetry.' : 'Waiting for GPS hardware to get a fix.') : browserLocation ? 'Location supplied by your browser after permission was granted.' : browserLocationError || 'No location has been requested or received.'}</p>
+                      <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>{isDeviceConnected ? (hasGpsFix ? 'Location supplied by live ESP32 telemetry.' : 'Waiting for GPS hardware to get a fix.') : browserLocation ? 'Location supplied by your browser after permission was granted.' : browserLocationError || 'No live location has been requested or received.'}</p>
                     </>
                   )}
                 </div>
@@ -621,15 +622,15 @@ export default function App() {
                     {isAlertActive ? 'Fall state detected. The dashboard warning is active.' : isDeviceConnected ? (telemetry?.fallDetected === undefined ? 'Waiting for fall-detection status from the device.' : 'The device currently reports no fall.') : 'Connect the ESP32 to receive live fall-detection readings.'}
                   </p>
                 </div>
-                <div style={{ marginTop: '12px', padding: '16px', borderRadius: '12px', border: telemetry?.obstacleDetected ? '1px solid #fed7aa' : '1px solid #e2e8f0', background: telemetry?.obstacleDetected ? '#fff7ed' : isDarkMode ? '#0f172a' : '#f8fafc', color: isDarkMode ? '#e2e8f0' : '#334155' }}>
+                <div style={{ marginTop: '12px', padding: '16px', borderRadius: '12px', border: isDeviceConnected && telemetry?.obstacleDetected ? '1px solid #fed7aa' : '1px solid #e2e8f0', background: isDeviceConnected && telemetry?.obstacleDetected ? '#fff7ed' : isDarkMode ? '#0f172a' : '#f8fafc', color: isDarkMode ? '#e2e8f0' : '#334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                     <span style={{ fontWeight: 800, fontSize: '14px' }}>Obstacle detection</span>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: telemetry?.obstacleDetected ? '#b45309' : '#64748b' }}>
-                      {telemetry?.obstacleDetected ? 'DETECTED · LOCAL NOTIFICATION' : isDeviceConnected && telemetry?.obstacleDetected === false ? 'CLEAR' : 'WAITING FOR SENSOR'}
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: isDeviceConnected && telemetry?.obstacleDetected ? '#b45309' : '#64748b' }}>
+                      {isDeviceConnected && telemetry?.obstacleDetected ? 'DETECTED · LOCAL NOTIFICATION' : isDeviceConnected && telemetry?.obstacleDetected === false ? 'CLEAR' : 'WAITING FOR SENSOR'}
                     </span>
                   </div>
                   <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.6, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
-                    {telemetry?.obstacleDetected
+                    {isDeviceConnected && telemetry?.obstacleDetected
                       ? 'An in-dashboard notification was created. No SMS or emergency contact message was sent.'
                       : isDeviceConnected && telemetry?.obstacleDetected === false
                         ? 'The connected device reports no obstacle. A new detection will create another local notification.'
@@ -667,10 +668,10 @@ export default function App() {
                     telemetry?.gyroscope ? `Gyro ${telemetry.gyroscope.x.toFixed(1)}, ${telemetry.gyroscope.y.toFixed(1)}, ${telemetry.gyroscope.z.toFixed(1)} °/s` : null,
                     telemetry?.fallDetected === undefined ? null : telemetry.fallDetected ? 'Fall detected' : 'No fall detected',
                   ].filter(Boolean).join(' · ') || 'Waiting for accelerometer, gyroscope, or fall-detection data.'} active={hasMotionData || telemetry?.fallDetected !== undefined} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
-                  <HardwareStatusCard title="Obstacle sensor" icon="🚧" status={telemetry?.obstacleDetected === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : telemetry.obstacleDetected ? 'Obstacle detected' : 'Clear'} detail={telemetry?.obstacleDetected ? 'Detection reported by the device; a local dashboard notification was created.' : telemetry?.obstacleDetected === false ? 'No obstacle reported by the device.' : 'Waiting for obstacle-detection status.'} active={telemetry?.obstacleDetected === true} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
-                  <HardwareStatusCard title="Battery" icon="🔋" status={!isDeviceConnected ? 'Not connected' : telemetry?.batteryPercent === undefined ? 'Not reported' : `${telemetry.batteryPercent}%`} detail={isDeviceConnected && telemetry?.batteryPercent !== undefined ? 'Battery level reported by the device.' : 'Waiting for a battery reading.'} active={isDeviceConnected && telemetry?.batteryPercent !== undefined} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
-                  <HardwareStatusCard title="GPS module" icon="🛰️" status={gps === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : hasGpsFix ? 'GPS fix' : 'No GPS fix'} detail={gps && hasGpsFix ? `${gps.latitude.toFixed(6)}, ${gps.longitude.toFixed(6)}` : 'Waiting for GPS coordinates and fix status.'} active={gps !== undefined && hasGpsFix} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
-                  <HardwareStatusCard title="LED indicators" icon="💡" status={telemetry?.ledsActive === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : telemetry.ledsActive ? 'Active' : 'Inactive'} detail="Read-only output status reported by the device." active={telemetry?.ledsActive === true} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
+                  <HardwareStatusCard title="Obstacle sensor" icon="🚧" status={telemetry?.obstacleDetected === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : telemetry.obstacleDetected ? 'Obstacle detected' : 'Clear'} detail={telemetry?.obstacleDetected === true ? 'Detection reported by the device; a local dashboard notification was created.' : telemetry?.obstacleDetected === false ? 'No obstacle reported by the device.' : isDeviceConnected ? 'Waiting for obstacle-detection status.' : 'Connect the ESP32 to receive obstacle-detection status.'} active={telemetry?.obstacleDetected === true} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
+                  <HardwareStatusCard title="Battery" icon="🔋" status={!isDeviceConnected ? 'Not connected' : telemetry?.batteryPercent === undefined ? 'Not reported' : `${telemetry.batteryPercent}%`} detail={isDeviceConnected && telemetry?.batteryPercent !== undefined ? 'Battery level reported by the device.' : isDeviceConnected ? 'Waiting for a battery reading.' : 'Connect the ESP32 to receive battery status.'} active={isDeviceConnected && telemetry?.batteryPercent !== undefined} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
+                  <HardwareStatusCard title="GPS module" icon="🛰️" status={telemetry?.gps === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : hasGpsFix ? 'GPS fix' : 'No GPS fix'} detail={telemetry?.gps && hasGpsFix ? `${telemetry.gps.latitude.toFixed(6)}, ${telemetry.gps.longitude.toFixed(6)}` : isDeviceConnected ? 'Waiting for GPS coordinates and fix status.' : 'Connect the ESP32 to receive GPS status.'} active={isDeviceConnected && telemetry?.gps !== undefined && hasGpsFix} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
+                  <HardwareStatusCard title="LED indicators" icon="💡" status={telemetry?.ledsActive === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : telemetry.ledsActive ? 'Active' : 'Inactive'} detail={isDeviceConnected && telemetry?.ledsActive !== undefined ? 'Read-only output status reported by the device.' : isDeviceConnected ? 'Waiting for LED status.' : 'Connect the ESP32 to receive LED status.'} active={telemetry?.ledsActive === true} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
                 </div>
               </section>
             )}

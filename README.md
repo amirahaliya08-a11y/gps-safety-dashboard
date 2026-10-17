@@ -17,7 +17,7 @@ npm.cmd run dev
 2. In the repository, open **Settings → Pages** and set the build and deployment source to **GitHub Actions**.
 3. The included workflow builds and deploys the site on each push. When it completes, the public address appears in the workflow run or under **Settings → Pages**.
 
-The deployment automatically uses the correct base path for either a project site or a user/organization site. The published site is publicly accessible. It does not invent sensor readings: live hardware values are shown only when received from a compatible ESP32. Do not publish private contact details or secrets.
+The deployment automatically uses the correct base path for either a project site or a user/organization site. The published site is publicly accessible. Sensor values and incidents are shown only when received from the connected ESP32 during the current session. Browser location is available separately and only after permission is granted. Missing readings are marked as waiting, not reported, or unavailable; GSM is shown only when supplied by the device. Do not publish private contact details or secrets.
 
 ## Collaborate with developers
 
@@ -59,7 +59,7 @@ The ESP32 firmware must expose the NUS service `6e400001-b5a3-f393-e0a9-e50e24dc
 }
 ```
 
-Coordinates are decimal degrees, accelerometer values are in m/s², gyroscope values are in degrees/second, and percentage fields are from 0 to 100. All telemetry fields are optional; when present, fall and obstacle detections, GSM registration, and electrode contact are booleans, while vibrator and LED fields report whether their outputs are active. Send `obstacleDetected: true` when an obstacle is detected and `false` when the sensor clears; each transition from clear to detected creates a local dashboard notification. This notification does not send an SMS, use GSM, or contact anyone. The dashboard validates incoming data and shows connection or message errors in its connection panel. Sparse telemetry updates retain each component's latest reported reading until the Bluetooth connection ends; fields not yet reported remain marked as waiting or not reported. The Overview incident timeline is built from session alerts. The Hardware view displays ESP32, motion, obstacle, battery, GPS, and LED status reported by the device; it does not send control commands.
+Coordinates are decimal degrees, accelerometer values are in m/s², gyroscope values are in degrees/second, and percentage fields are from 0 to 100. All telemetry fields are optional; when present, fall and obstacle detections, GSM registration, and electrode contact are booleans, while vibrator and LED fields report whether their outputs are active. Send `obstacleDetected: true` when an obstacle is detected and `false` when the sensor clears; each transition from clear to detected creates a local dashboard notification. This notification does not send an SMS, use GSM, or contact anyone. The dashboard validates incoming data and shows connection or message errors in its connection panel. Sparse telemetry updates retain each component's latest reported reading until the Bluetooth connection ends; fields not yet reported remain marked as waiting or not reported. Sensor readings and incident entries are never synthesized: the timeline shows only alerts created from received device data, or an empty state. GSM status is only shown when reported by the ESP32. The Hardware view displays ESP32, motion, obstacle, battery, GPS, and LED status; it does not send control commands.
 
 Bluetooth access requires a browser with Web Bluetooth support and a secure context (HTTPS or `localhost`). The repository contains the dashboard only, not ESP32 firmware; GPIO wiring, voltage levels, sensor drivers, fall thresholds, GSM network/SIM configuration, Bluetooth advertising, and local output behavior must be implemented and tested in firmware for the chosen modules.
 
@@ -79,8 +79,9 @@ Without a configured key, the dashboard shows live coordinates and accuracy with
 
 ## Prototype boundaries
 
-- Without an ESP32 Bluetooth connection, hardware readings such as battery, motion, fall, and obstacle status are unavailable and are shown as waiting or not reported. Browser location can be started separately with user permission; it reports the browser device's location, not the ESP32's.
-- The Overview incident timeline contains only session alerts; it does not calculate a safety score.
+- Battery, motion, fall, obstacle, GPS, and GSM values are shown only when supplied by live ESP32 telemetry. Unavailable readings are not replaced with sample data.
+- Browser location can be started separately with user permission; it reports the browser device's current location, not the ESP32's, and is not a substitute for device GPS.
+- The Overview incident timeline contains only alerts created from received device telemetry during the current session; otherwise it shows an empty state. It does not calculate a safety score.
 - Emergency contacts and SMS/call delivery are not configured. All dashboard notifications are local and are not sent to another person.
 - Obstacle detections create local dashboard notifications only. They do not send SMS messages or contact caregivers.
 - A live ESP32 connection displays hardware telemetry, but this prototype does not contact caregivers or emergency services.
