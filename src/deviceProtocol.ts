@@ -18,6 +18,7 @@ export interface DeviceTelemetry {
   }
   batteryPercent?: number
   fallDetected?: boolean
+  obstacleDetected?: boolean
   buzzerActive?: boolean
   gsm?: {
     registered: boolean
@@ -107,6 +108,11 @@ export function parseDeviceMessage(message: string): DeviceTelemetry {
   if (value.fallDetected !== undefined) {
     if (typeof value.fallDetected !== 'boolean') throw new Error('fallDetected must be a boolean')
     telemetry.fallDetected = value.fallDetected
+  }
+
+  if (value.obstacleDetected !== undefined) {
+    if (typeof value.obstacleDetected !== 'boolean') throw new Error('obstacleDetected must be a boolean')
+    telemetry.obstacleDetected = value.obstacleDetected
   }
 
   if (value.buzzerActive !== undefined) {

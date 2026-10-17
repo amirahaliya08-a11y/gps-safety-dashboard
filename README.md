@@ -17,7 +17,7 @@ npm.cmd run dev
 2. In the repository, open **Settings → Pages** and set the build and deployment source to **GitHub Actions**.
 3. The included workflow builds and deploys the site on each push. When it completes, the public address appears in the workflow run or under **Settings → Pages**.
 
-The deployment automatically uses the correct base path for either a project site or a user/organization site. The published site is publicly accessible; it is still a prototype and displays demo data until a compatible ESP32 is connected. Do not publish private contact details or secrets.
+The deployment automatically uses the correct base path for either a project site or a user/organization site. The published site is publicly accessible. It does not invent sensor readings: live hardware values are shown only when received from a compatible ESP32. Do not publish private contact details or secrets.
 
 ## Collaborate with developers
 
@@ -50,6 +50,7 @@ The ESP32 firmware must expose the NUS service `6e400001-b5a3-f393-e0a9-e50e24dc
   "gyroscope": { "x": 0.0, "y": 0.1, "z": 0.0 },
   "batteryPercent": 82,
   "fallDetected": false,
+  "obstacleDetected": false,
   "buzzerActive": false,
   "gsm": { "registered": true, "signalPercent": 76, "network": "Example network" },
   "vibratorActive": false,
@@ -58,13 +59,15 @@ The ESP32 firmware must expose the NUS service `6e400001-b5a3-f393-e0a9-e50e24dc
 }
 ```
 
-Coordinates are decimal degrees, accelerometer values are in m/s², gyroscope values are in degrees/second, and percentage fields are from 0 to 100. All telemetry fields are optional; when present, GSM registration and electrode contact are booleans, while vibrator and LED fields report whether their outputs are active. The dashboard validates incoming data and shows connection or message errors in its connection panel and activity log. Its Hardware view only displays status sent by the ESP32; it does not send commands to the vibrator, LEDs, electrodes, or GSM module. Electrodes are treated as sensing-only inputs. A live connection replaces sample values only with readings actually received; missing values stay marked as waiting or not reported.
+Coordinates are decimal degrees, accelerometer values are in m/s², gyroscope values are in degrees/second, and percentage fields are from 0 to 100. All telemetry fields are optional; when present, fall and obstacle detections, GSM registration, and electrode contact are booleans, while vibrator and LED fields report whether their outputs are active. Send `obstacleDetected: true` when an obstacle is detected and `false` when the sensor clears; each transition from clear to detected creates a local dashboard notification. This notification does not send an SMS, use GSM, or contact anyone. The dashboard validates incoming data and shows connection or message errors in its connection panel. Sparse telemetry updates retain each component's latest reported reading until the Bluetooth connection ends; fields not yet reported remain marked as waiting or not reported. The Overview incident timeline is built from session alerts. The Hardware view displays ESP32, motion, obstacle, battery, GPS, and LED status reported by the device; it does not send control commands.
 
 Bluetooth access requires a browser with Web Bluetooth support and a secure context (HTTPS or `localhost`). The repository contains the dashboard only, not ESP32 firmware; GPIO wiring, voltage levels, sensor drivers, fall thresholds, GSM network/SIM configuration, Bluetooth advertising, and local output behavior must be implemented and tested in firmware for the chosen modules.
 
 ## Google Maps preview (optional)
 
-The location panel shows an illustrative map until a Google Maps Embed API key is configured.
+The location panel can show live coordinates from the connected ESP32 or, with permission, the browser device's location. A Google Maps view requires an API key.
+
+To use browser location, open the **Location** tab and choose **Start live browser location**. The browser will ask for permission; this works on HTTPS or `localhost`. It reports the browser device's position, not the wearable's, and is cleared when tracking is stopped.
 
 1. Copy `.env.example` to `.env`.
 2. Set `VITE_GOOGLE_MAPS_API_KEY` in `.env` to a key with the Google Maps Embed API enabled.
@@ -72,12 +75,14 @@ The location panel shows an illustrative map until a Google Maps Embed API key i
 
 Restrict the key to the development/production websites and only the APIs you use. Vite variables prefixed with `VITE_` are included in the browser bundle; this key is not a secret.
 
-Without a configured key, the dashboard uses a local stylized map preview. With a key, Google Maps centers on the latest GPS coordinates from the connected ESP32; in demo mode it shows the sample coordinates.
+Without a configured key, the dashboard shows live coordinates and accuracy without an embedded map. With a key, Google Maps centers on the latest available live coordinates (ESP32 GPS when connected, otherwise browser location).
 
 ## Prototype boundaries
 
-- Without an ESP32 Bluetooth connection, location, status, and activity readings are sample data and do not come from hardware.
-- The **Simulate fall alert** control only changes the on-screen demo state. It does not send a notification or contact anyone.
+- Without an ESP32 Bluetooth connection, hardware readings such as battery, motion, fall, and obstacle status are unavailable and are shown as waiting or not reported. Browser location can be started separately with user permission; it reports the browser device's location, not the ESP32's.
+- The Overview incident timeline contains only session alerts; it does not calculate a safety score.
+- Emergency contacts and SMS/call delivery are not configured. All dashboard notifications are local and are not sent to another person.
+- Obstacle detections create local dashboard notifications only. They do not send SMS messages or contact caregivers.
 - A live ESP32 connection displays hardware telemetry, but this prototype does not contact caregivers or emergency services.
 - This prototype is not an emergency service and should not be relied on for personal safety.
 - A visual dashboard alone is not an accessible alert channel for a deafblind user; a production system needs user-tested accessible/tactile notifications and appropriate caregiver workflows.
