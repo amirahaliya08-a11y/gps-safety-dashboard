@@ -294,7 +294,6 @@ export default function App() {
   const isDeviceConnected = connectionStatus === 'connected';
   const isAlertActive = isDeviceConnected && telemetry?.fallDetected === true;
   const contactAlertStatus = isAlertActive ? 'setup-required' : 'standby';
-  const batteryLevel = isDeviceConnected ? telemetry?.batteryPercent ?? null : null;
   const gps = isDeviceConnected
     ? telemetry?.gps
     : browserLocation
@@ -373,7 +372,6 @@ export default function App() {
 
   const overviewKpis = [
     { label: 'Fall detection', value: fallStatus, tone: isAlertActive ? '#dc2626' : isDeviceConnected && telemetry?.fallDetected === false ? '#059669' : '#4f46e5', icon: '🛡️' },
-    { label: 'Battery', value: batteryLevel === null ? 'Not reported' : `${batteryLevel}%`, tone: '#3b82f6', icon: '🔋' },
     { label: 'GPS', value: gpsStatus, tone: '#8b5cf6', icon: '📍' },
     { label: 'Motion', value: motionStatus, tone: '#f59e0b', icon: '⚡' },
   ];
@@ -669,7 +667,6 @@ export default function App() {
                     telemetry?.fallDetected === undefined ? null : telemetry.fallDetected ? 'Fall detected' : 'No fall detected',
                   ].filter(Boolean).join(' · ') || 'Waiting for accelerometer, gyroscope, or fall-detection data.'} active={hasMotionData || telemetry?.fallDetected !== undefined} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
                   <HardwareStatusCard title="Obstacle sensor" icon="🚧" status={telemetry?.obstacleDetected === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : telemetry.obstacleDetected ? 'Obstacle detected' : 'Clear'} detail={telemetry?.obstacleDetected === true ? 'Detection reported by the device; a local dashboard notification was created.' : telemetry?.obstacleDetected === false ? 'No obstacle reported by the device.' : isDeviceConnected ? 'Waiting for obstacle-detection status.' : 'Connect the ESP32 to receive obstacle-detection status.'} active={telemetry?.obstacleDetected === true} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
-                  <HardwareStatusCard title="Battery" icon="🔋" status={!isDeviceConnected ? 'Not connected' : telemetry?.batteryPercent === undefined ? 'Not reported' : `${telemetry.batteryPercent}%`} detail={isDeviceConnected && telemetry?.batteryPercent !== undefined ? 'Battery level reported by the device.' : isDeviceConnected ? 'Waiting for a battery reading.' : 'Connect the ESP32 to receive battery status.'} active={isDeviceConnected && telemetry?.batteryPercent !== undefined} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
                   <HardwareStatusCard title="GPS module" icon="🛰️" status={telemetry?.gps === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : hasGpsFix ? 'GPS fix' : 'No GPS fix'} detail={telemetry?.gps && hasGpsFix ? `${telemetry.gps.latitude.toFixed(6)}, ${telemetry.gps.longitude.toFixed(6)}` : isDeviceConnected ? 'Waiting for GPS coordinates and fix status.' : 'Connect the ESP32 to receive GPS status.'} active={isDeviceConnected && telemetry?.gps !== undefined && hasGpsFix} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
                   <HardwareStatusCard title="LED indicators" icon="💡" status={telemetry?.ledsActive === undefined ? isDeviceConnected ? 'Not reported' : 'Not connected' : telemetry.ledsActive ? 'Active' : 'Inactive'} detail={isDeviceConnected && telemetry?.ledsActive !== undefined ? 'Read-only output status reported by the device.' : isDeviceConnected ? 'Waiting for LED status.' : 'Connect the ESP32 to receive LED status.'} active={telemetry?.ledsActive === true} onConnect={connectToDevice} connectDisabled={connectionStatus === 'connecting' || isDeviceConnected} connectLabel={connectionStatus === 'connecting' ? 'Connecting…' : isDeviceConnected ? 'ESP32 connected' : 'Connect via ESP32'} />
                 </div>
