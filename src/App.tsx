@@ -89,7 +89,11 @@ export default function App() {
 
   const startBrowserLocation = () => {
     if (!navigator.geolocation) {
-      setBrowserLocationError('Live browser location is not supported by this browser.');
+      setBrowserLocationError(
+        window.isSecureContext
+          ? 'Live browser location is not supported by this browser.'
+          : 'Live browser location requires a secure connection (HTTPS or localhost).',
+      );
       return;
     }
 
@@ -105,20 +109,23 @@ export default function App() {
         setBrowserLocationError('');
       },
       error => {
-        const message = error.code === error.PERMISSION_DENIED
-          ? 'Location permission was denied. Allow location access in your browser to use live browser location.'
+        const permissionDenied = error.code === error.PERMISSION_DENIED;
+        const message = permissionDenied
+          ? 'Location permission was denied. Allow location access in your browser, then start tracking again.'
           : error.code === error.POSITION_UNAVAILABLE
-            ? 'The browser could not determine your current location.'
-            : 'Timed out while requesting your current location.';
+            ? 'The browser cannot determine your location yet. Tracking will keep trying.'
+            : 'The location lookup timed out. Tracking will keep trying for a GPS fix.';
         setBrowserLocationError(message);
-        setBrowserLocation(null);
-        setBrowserLocationWatching(false);
-        if (locationWatchIdRef.current !== null) {
+        if (permissionDenied) {
+          setBrowserLocation(null);
+          setBrowserLocationWatching(false);
+        }
+        if (permissionDenied && locationWatchIdRef.current !== null) {
           navigator.geolocation.clearWatch(locationWatchIdRef.current);
           locationWatchIdRef.current = null;
         }
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 60000 },
     );
     locationWatchIdRef.current = watchId;
     setBrowserLocationWatching(true);

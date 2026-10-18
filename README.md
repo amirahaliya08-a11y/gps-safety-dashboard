@@ -71,7 +71,7 @@ Bluetooth access requires a browser with Web Bluetooth support and a secure cont
 
 The Location tab displays an interactive OpenStreetMap map and follows incoming GPS fixes. As new fixes arrive from the connected ESP32 or browser, the map moves to the latest location and draws the route so far (up to 500 recent fixes). The last recorded route stays visible when updates stop. OpenStreetMap tiles are used without a Google Maps API key.
 
-For ESP32 tracking, connect the device and send GPS coordinates in its telemetry. To track this computer or phone instead, open the **Location** tab and choose **Start live browser location**. The browser asks for permission; this works on HTTPS or `localhost`. Browser tracking reports the browser device's position, not the wearable's. Stop tracking to stop browser location updates. No map marker or route is shown until a real location fix is received.
+For ESP32 tracking, connect the device and send GPS coordinates in its telemetry. To track this computer or phone instead, open the **Location** tab and choose **Start live browser location**. The browser asks for permission; this works on HTTPS or `localhost`. Browser tracking reports the browser device's position, not the wearable's. A delayed or temporarily unavailable fix does not stop browser tracking; it keeps waiting for another update. Stop tracking to stop browser location updates. No map marker or route is shown until a real location fix is received.
 
 The app switches to a red alert theme and displays a prominent banner while the connected ESP32 reports an active fall. The alert clears when the device reports that the fall state is clear or disconnects. Dashboard alerts do not send SMS or call emergency contacts.
 
