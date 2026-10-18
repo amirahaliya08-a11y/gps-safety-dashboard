@@ -362,11 +362,148 @@ button {
   cursor: pointer;
 }
 
-.map-frame {
-  display: block;
+.live-map-frame {
+  width: 100%;
+  height: 420px;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #e2e8f0;
+}
+
+.live-location-map {
   width: 100%;
   height: 100%;
-  border: 0;
+  z-index: 0;
+}
+
+.location-map-status {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.fall-alert-active {
+  background: linear-gradient(145deg, #fee2e2 0%, #fecaca 50%, #fff1f2 100%) !important;
+  color: #7f1d1d !important;
+}
+
+.fall-alert-active .app-header,
+.fall-alert-active .app-dashboard-sidebar,
+.fall-alert-active .app-dashboard-layout main > section,
+.fall-alert-active .app-dashboard-layout main > div {
+  border-color: #fda4af !important;
+  box-shadow: 0 12px 30px rgba(185, 28, 28, 0.1) !important;
+}
+
+.fall-alert-active[data-theme='light'] .app-header,
+.fall-alert-active[data-theme='light'] .app-dashboard-sidebar,
+.fall-alert-active[data-theme='light'] .app-dashboard-layout main > section,
+.fall-alert-active[data-theme='light'] .app-dashboard-layout main > div {
+  background: rgba(255, 241, 242, 0.96) !important;
+}
+
+.fall-alert-active[data-theme='dark'] {
+  background: linear-gradient(145deg, #450a0a 0%, #1f1015 55%, #020617 100%) !important;
+  color: #fee2e2 !important;
+}
+
+.fall-alert-active[data-theme='dark'] .app-header,
+.fall-alert-active[data-theme='dark'] .app-dashboard-sidebar,
+.fall-alert-active[data-theme='dark'] .app-dashboard-layout main > section,
+.fall-alert-active[data-theme='dark'] .app-dashboard-layout main > div {
+  background: rgba(69, 10, 10, 0.92) !important;
+}
+
+.fall-alert-active .app-navigation {
+  background: #fecdd3 !important;
+}
+
+.fall-alert-active .app-navigation button[aria-current='page'] {
+  background: #b91c1c !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.2) !important;
+}
+
+.fall-alert-active[data-theme='dark'] .app-navigation {
+  background: #450a0a !important;
+}
+
+.fall-alert-active[data-theme='dark'] .app-navigation button[aria-current='page'] {
+  background: #991b1b !important;
+}
+
+.fall-alert-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 14px 18px;
+  border: 1px solid #b91c1c;
+  border-radius: 14px;
+  background: #b91c1c;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(185, 28, 28, 0.28);
+  animation: fall-alert-pulse 1.8s ease-in-out infinite;
+}
+
+.connection-action-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.start-demo-button,
+.demo-alert-button,
+.stop-demo-button {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.start-demo-button {
+  border-color: #f59e0b;
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.demo-alert-button-active {
+  border-color: #b91c1c;
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.fall-alert-active .demo-alert-button:not(.demo-alert-button-active) {
+  border-color: #b91c1c;
+  color: #991b1b;
+}
+
+.fall-alert-active[data-theme='dark'] .start-demo-button,
+.fall-alert-active[data-theme='dark'] .stop-demo-button {
+  border-color: #fda4af;
+  background: #450a0a;
+  color: #fee2e2;
+}
+
+@keyframes fall-alert-pulse {
+  50% { box-shadow: 0 8px 30px rgba(185, 28, 28, 0.5); }
 }
 
 .hardware-status-card {
@@ -446,6 +583,14 @@ button:focus-visible {
 }
 
 @media (max-width: 760px) {
+  .live-map-frame {
+    height: 340px;
+  }
+
+  .location-map-status {
+    flex-direction: column;
+  }
+
   .app-shell {
     padding: 12px 12px 32px !important;
   }

@@ -15,7 +15,11 @@ npm.cmd run dev
 
 1. Create a GitHub repository and push this project to its `main` or `master` branch.
 2. In the repository, open **Settings → Pages** and set the build and deployment source to **GitHub Actions**.
-3. The included workflow builds and deploys the site on each push. When it completes, the public address appears in the workflow run or under **Settings → Pages**.
+3. The `.github/workflows/deploy.yml` workflow builds and deploys the site on each push. When it completes, the public address appears in the workflow run or under **Settings → Pages**.
+
+## Publish with Netlify
+
+Import this GitHub repository in Netlify and use the repository root as the base directory. The included `netlify.toml` configures `npm run build`, publishes the `dist` directory, and selects Node.js 22. Once the site is linked to GitHub, each push to the production branch triggers a Netlify deployment.
 
 The deployment automatically uses the correct base path for either a project site or a user/organization site. The published site is publicly accessible. Sensor values and incidents are shown only when received from the connected ESP32 during the current session. Browser location is available separately and only after permission is granted. Missing readings are marked as waiting, not reported, or unavailable; GSM is shown only when supplied by the device. Do not publish private contact details or secrets.
 
@@ -63,25 +67,21 @@ Coordinates are decimal degrees, accelerometer values are in m/s², gyroscope va
 
 Bluetooth access requires a browser with Web Bluetooth support and a secure context (HTTPS or `localhost`). The repository contains the dashboard only, not ESP32 firmware; GPIO wiring, voltage levels, sensor drivers, fall thresholds, GSM network/SIM configuration, Bluetooth advertising, and local output behavior must be implemented and tested in firmware for the chosen modules.
 
-## Google Maps preview (optional)
+## Live location map
 
-The location panel can show live coordinates from the connected ESP32 or, with permission, the browser device's location. A Google Maps view requires an API key.
+The Location tab displays an interactive OpenStreetMap map and follows incoming GPS fixes. As new fixes arrive from the connected ESP32 or browser, the map moves to the latest location and draws the route so far (up to 500 recent fixes). The last recorded route stays visible when updates stop. OpenStreetMap tiles are used without a Google Maps API key.
 
-To use browser location, open the **Location** tab and choose **Start live browser location**. The browser will ask for permission; this works on HTTPS or `localhost`. It reports the browser device's position, not the wearable's, and is cleared when tracking is stopped.
+For ESP32 tracking, connect the device and send GPS coordinates in its telemetry. To track this computer or phone instead, open the **Location** tab and choose **Start live browser location**. The browser asks for permission; this works on HTTPS or `localhost`. Browser tracking reports the browser device's position, not the wearable's. Stop tracking to stop browser location updates. No map marker or route is shown until a real location fix is received.
 
-1. Copy `.env.example` to `.env`.
-2. Set `VITE_GOOGLE_MAPS_API_KEY` in `.env` to a key with the Google Maps Embed API enabled.
-3. Restart the Vite development server.
+The app switches to a red alert theme and displays a prominent banner while the connected ESP32 reports an active fall. The alert clears when the device reports that the fall state is clear or disconnects. Dashboard alerts do not send SMS or call emergency contacts.
 
-Restrict the key to the development/production websites and only the APIs you use. Vite variables prefixed with `VITE_` are included in the browser bundle; this key is not a secret.
-
-Without a configured key, the dashboard shows live coordinates and accuracy without an embedded map. With a key, Google Maps centers on the latest available live coordinates (ESP32 GPS when connected, otherwise browser location).
+To preview the interface without hardware, choose **Start showcase demo**. This explicitly labeled simulation animates a sample GPS route and starts with a demo fall alert so both features are visible. Use **Clear demo fall alert** / **Trigger demo fall alert** to switch the red alert on and off, and **Stop demo** to discard the simulated route. Demo data is not real telemetry and does not represent a person's location or send emergency messages.
 
 ## Prototype boundaries
 
-- Battery, motion, fall, obstacle, GPS, and GSM values are shown only when supplied by live ESP32 telemetry. Unavailable readings are not replaced with sample data.
+- In normal operation, battery, motion, fall, obstacle, GPS, and GSM values are shown only when supplied by live ESP32 telemetry. The optional showcase demo is clearly labeled and simulates only a sample GPS route and fall alert; it does not generate hardware readings.
 - Browser location can be started separately with user permission; it reports the browser device's current location, not the ESP32's, and is not a substitute for device GPS.
-- The Overview incident timeline contains only alerts created from received device telemetry during the current session; otherwise it shows an empty state. It does not calculate a safety score.
+- The Overview incident timeline contains alerts received from device telemetry or explicitly generated by the showcase demo during the current session. It does not calculate a safety score.
 - Emergency contacts and SMS/call delivery are not configured. All dashboard notifications are local and are not sent to another person.
 - Obstacle detections create local dashboard notifications only. They do not send SMS messages or contact caregivers.
 - A live ESP32 connection displays hardware telemetry, but this prototype does not contact caregivers or emergency services.

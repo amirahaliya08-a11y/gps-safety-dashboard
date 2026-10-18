@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { parseDeviceMessage, type DeviceTelemetry } from './deviceProtocol';
+import LiveLocationMap, { type TrackedLocation } from './LiveLocationMap';
 
 interface BluetoothCharacteristic extends EventTarget {
   value: DataView | null
@@ -27,12 +28,28 @@ interface BluetoothApi {
 
 const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const UART_TX_CHARACTERISTIC_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+const DEMO_ROUTE: Array<Omit<TrackedLocation, 'timestamp'>> = [
+  { latitude: 3.1390, longitude: 101.6869 },
+  { latitude: 3.1392, longitude: 101.6872 },
+  { latitude: 3.1395, longitude: 101.6874 },
+  { latitude: 3.1398, longitude: 101.6871 },
+  { latitude: 3.1401, longitude: 101.6868 },
+  { latitude: 3.1404, longitude: 101.6870 },
+  { latitude: 3.1406, longitude: 101.6874 },
+  { latitude: 3.1409, longitude: 101.6876 },
+  { latitude: 3.1412, longitude: 101.6873 },
+  { latitude: 3.1415, longitude: 101.6870 },
+];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'overview' | 'location' | 'alerts' | 'hardware'>('overview');
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light');
   const [telemetry, setTelemetry] = useState<DeviceTelemetry | null>(null);
   const [browserLocation, setBrowserLocation] = useState<GeolocationPosition | null>(null);
+  const [locationTrail, setLocationTrail] = useState<TrackedLocation[]>([]);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoFallAlert, setDemoFallAlert] = useState(false);
+  const [demoLocation, setDemoLocation] = useState<TrackedLocation | null>(null);
   const [browserLocationWatching, setBrowserLocationWatching] = useState(false);
   const [browserLocationError, setBrowserLocationError] = useState('');
   const [connectionStatus, setConnectionStatus] = useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected');
@@ -50,6 +67,9 @@ export default function App() {
   const lineBufferRef = useRef('');
   const decoderRef = useRef(new TextDecoder());
   const locationWatchIdRef = useRef<number | null>(null);
+  const locationTrailRef = useRef<TrackedLocation[]>([]);
+  const locationSourceRef = useRef<'device' | 'browser' | 'demo' | null>(null);
+  const demoPositionIndexRef = useRef(0);
   useEffect(() => {
     return () => {
       const device = deviceRef.current;
@@ -113,6 +133,35 @@ export default function App() {
     setBrowserLocation(null);
   };
 
+  const stopDemo = () => {
+    setDemoMode(false);
+    setDemoFallAlert(false);
+    setDemoLocation(null);
+    demoPositionIndexRef.current = 0;
+    locationTrailRef.current = [];
+    locationSourceRef.current = null;
+    setLocationTrail([]);
+  };
+
+  const startDemo = () => {
+    stopBrowserLocation();
+    setBrowserLocationError('');
+    const now = Date.now();
+    const initialTrail = DEMO_ROUTE.slice(0, 4).map((location, index) => ({
+      ...location,
+      timestamp: now - (3 - index) * 2200,
+    }));
+    const latestLocation = initialTrail[initialTrail.length - 1];
+    locationTrailRef.current = initialTrail;
+    locationSourceRef.current = 'demo';
+    setLocationTrail(initialTrail);
+    setDemoLocation(latestLocation);
+    demoPositionIndexRef.current = initialTrail.length - 1;
+    setDemoFallAlert(true);
+    setDemoMode(true);
+    setActiveTab('location');
+  };
+
   const addObstacleNotification = () => {
     const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setNotifications(prev => [{
@@ -126,6 +175,7 @@ export default function App() {
 
   const connectToDevice = async () => {
     if (connectInProgressRef.current) return;
+    if (demoMode) stopDemo();
     connectInProgressRef.current = true;
     setConnectionError('');
     setConnectionStatus('connecting');
@@ -292,34 +342,73 @@ export default function App() {
   };
 
   const isDeviceConnected = connectionStatus === 'connected';
-  const isAlertActive = isDeviceConnected && telemetry?.fallDetected === true;
+  const isAlertActive = (isDeviceConnected && telemetry?.fallDetected === true) || (demoMode && demoFallAlert);
   const contactAlertStatus = isAlertActive ? 'setup-required' : 'standby';
   const gps = isDeviceConnected
     ? telemetry?.gps
-    : browserLocation
+    : demoMode && demoLocation
+      ? { latitude: demoLocation.latitude, longitude: demoLocation.longitude, fix: true }
+      : browserLocation
       ? { latitude: browserLocation.coords.latitude, longitude: browserLocation.coords.longitude, fix: true }
       : undefined;
   const hasGpsFix = gps !== undefined && gps.fix !== false;
   const hasMotionData = Boolean(telemetry?.accelerometer || telemetry?.gyroscope);
   const mapLocation = gps && hasGpsFix ? gps : null;
-  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-  const mapEmbedUrl = mapsApiKey && mapLocation
-    ? `https://www.google.com/maps/embed/v1/view?key=${encodeURIComponent(mapsApiKey)}&center=${mapLocation.latitude},${mapLocation.longitude}&zoom=16`
-    : null;
+  const mapLatitude = mapLocation?.latitude;
+  const mapLongitude = mapLocation?.longitude;
+  useEffect(() => {
+    if (mapLatitude === undefined || mapLongitude === undefined) return;
+
+    const source = isDeviceConnected ? 'device' : demoMode ? 'demo' : 'browser';
+    const point = {
+      latitude: mapLatitude,
+      longitude: mapLongitude,
+      timestamp: Date.now(),
+    };
+    const previousTrail = locationTrailRef.current;
+    const lastPoint = previousTrail.at(-1);
+    const nextTrail = locationSourceRef.current !== source
+      ? [point]
+      : lastPoint?.latitude === point.latitude && lastPoint.longitude === point.longitude
+        ? previousTrail
+        : [...previousTrail, point].slice(-500);
+
+    locationSourceRef.current = source;
+    if (nextTrail !== previousTrail) {
+      locationTrailRef.current = nextTrail;
+      setLocationTrail(nextTrail);
+    }
+  }, [mapLatitude, mapLongitude, isDeviceConnected, demoMode]);
   const coordinates = gps && hasGpsFix
     ? `${gps.latitude.toFixed(4)}°, ${gps.longitude.toFixed(4)}°`
-    : isDeviceConnected ? 'Waiting for GPS fix' : browserLocationWatching ? 'Waiting for location fix' : 'Live location not started';
-  const fallStatus = isDeviceConnected
+    : isDeviceConnected ? 'Waiting for GPS fix' : demoMode ? 'Waiting for demo GPS fix' : browserLocationWatching ? 'Waiting for location fix' : 'Live location not started';
+  const fallStatus = demoMode
+    ? demoFallAlert ? 'Demo fall detected' : 'Demo: no fall detected'
+    : isDeviceConnected
     ? telemetry?.fallDetected === undefined
       ? 'Waiting for fall status'
       : isAlertActive ? 'Fall detected' : 'No fall detected'
     : 'Waiting for device data';
-  const gpsStatus = isDeviceConnected
+  const gpsStatus = demoMode
+    ? gps === undefined ? 'Waiting for demo location' : 'Simulated GPS route'
+    : isDeviceConnected
     ? gps === undefined ? 'Not reported' : hasGpsFix ? 'GPS fix' : 'No fix'
     : browserLocation ? 'Browser location fix' : browserLocationWatching ? 'Waiting for location fix' : 'Not started';
   const motionStatus = isDeviceConnected
     ? hasMotionData ? 'Motion data received' : 'Not reported'
-    : 'Not connected';
+    : demoMode ? 'Simulated demo data' : 'Not connected';
+
+  useEffect(() => {
+    if (!demoMode) return;
+
+    const intervalId = window.setInterval(() => {
+      if (demoPositionIndexRef.current >= DEMO_ROUTE.length - 1) return;
+      demoPositionIndexRef.current += 1;
+      setDemoLocation({ ...DEMO_ROUTE[demoPositionIndexRef.current], timestamp: Date.now() });
+    }, 2200);
+
+    return () => window.clearInterval(intervalId);
+  }, [demoMode]);
 
   useEffect(() => {
     if (isAlertActive) {
@@ -328,14 +417,14 @@ export default function App() {
         setNotifications(prev => [{
           id: Date.now(),
           type: 'alert',
-          title: 'Fall detected · message not sent',
+          title: demoMode ? 'Demo fall alert · simulated only' : 'Fall detected · message not sent',
           time: timeNow,
-          detail: 'No SMS or call service is configured; no message was sent.',
+          detail: demoMode ? 'Showcase data only. No real fall was detected and no message was sent.' : 'No SMS or call service is configured; no message was sent.',
         }, ...prev].slice(0, 4));
       }
     }
     previousAlertActiveRef.current = isAlertActive;
-  }, [isAlertActive, isDeviceConnected]);
+  }, [isAlertActive, isDeviceConnected, demoMode]);
 
   const tabs: { id: typeof activeTab; label: string; icon: string; badge?: string | null }[] = [
     { id: 'overview', label: 'Overview', icon: '🏠' },
@@ -371,14 +460,14 @@ export default function App() {
   };
 
   const overviewKpis = [
-    { label: 'Fall detection', value: fallStatus, tone: isAlertActive ? '#dc2626' : isDeviceConnected && telemetry?.fallDetected === false ? '#059669' : '#4f46e5', icon: '🛡️' },
+    { label: 'Fall detection', value: fallStatus, tone: isAlertActive ? '#dc2626' : (isDeviceConnected && telemetry?.fallDetected === false) || (demoMode && !demoFallAlert) ? '#059669' : '#4f46e5', icon: '🛡️' },
     { label: 'GPS', value: gpsStatus, tone: '#8b5cf6', icon: '📍' },
     { label: 'Motion', value: motionStatus, tone: '#f59e0b', icon: '⚡' },
   ];
   const incidentTimeline = notifications.slice(0, 3);
 
   return (
-    <div data-theme={isDarkMode ? 'dark' : 'light'} style={{ minHeight: '100vh', background: isDarkMode ? 'radial-gradient(circle at top, #111827 0%, #020817 45%, #020617 100%)' : 'linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)', color: isDarkMode ? '#e2e8f0' : '#0f172a', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '3rem' }}>
+    <div className={isAlertActive ? 'fall-alert-active' : undefined} data-fall-alert={isAlertActive} data-theme={isDarkMode ? 'dark' : 'light'} style={{ minHeight: '100vh', background: isDarkMode ? 'radial-gradient(circle at top, #111827 0%, #020817 45%, #020617 100%)' : 'linear-gradient(180deg, #f8fafc 0%, #eef4ff 100%)', color: isDarkMode ? '#e2e8f0' : '#0f172a', fontFamily: 'system-ui, -apple-system, sans-serif', paddingBottom: '3rem' }}>
       <div className="app-shell" style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 20px 48px' }}>
         <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap', padding: '14px 18px', borderRadius: '18px', background: isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255,255,255,0.75)', border: isDarkMode ? '1px solid rgba(148,163,184,0.18)' : '1px solid rgba(148,163,184,0.2)', boxShadow: isDarkMode ? '0 12px 30px rgba(2,6,23,0.32)' : '0 12px 30px rgba(15,23,42,0.06)', backdropFilter: 'blur(12px)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -386,7 +475,7 @@ export default function App() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <h1 style={{ margin: 0, fontSize: '20px', fontWeight: 800, letterSpacing: '-0.04em', color: isDarkMode ? '#f8fafc' : '#0f172a' }}>SafeHaven</h1>
-                <span style={{ fontSize: '10px', background: isDeviceConnected ? '#dcfce7' : '#e0e7ff', color: isDeviceConnected ? '#15803d' : '#4f46e5', fontWeight: 700, padding: '3px 8px', borderRadius: '999px' }}>{isDeviceConnected ? 'DEVICE LIVE' : 'WAITING FOR DATA'}</span>
+                <span style={{ fontSize: '10px', background: demoMode ? '#fef3c7' : isDeviceConnected ? '#dcfce7' : '#e0e7ff', color: demoMode ? '#92400e' : isDeviceConnected ? '#15803d' : '#4f46e5', fontWeight: 700, padding: '3px 8px', borderRadius: '999px' }}>{demoMode ? 'DEMO · SIMULATED' : isDeviceConnected ? 'DEVICE LIVE' : 'WAITING FOR DATA'}</span>
               </div>
               <div style={{ fontSize: '12px', color: isDarkMode ? '#cbd5e1' : '#64748b', marginTop: '2px' }}>Command center · GPS + fall protection</div>
             </div>
@@ -413,6 +502,11 @@ export default function App() {
             </nav>
           </div>
         </header>
+        {isAlertActive && (
+          <div className="fall-alert-banner" role="alert" aria-live="assertive">
+            <span aria-hidden="true">⚠</span> {demoMode ? 'DEMO FALL ALERT · SIMULATED SHOWCASE ONLY' : 'FALL DETECTED · Dashboard alert active'}
+          </div>
+        )}
         {shareFeedback && (
           <div role="status" aria-live="polite" style={{ margin: '10px 4px 0', color: isDarkMode ? '#cbd5e1' : '#475569', fontSize: '13px' }}>
             {shareFeedback}
@@ -438,12 +532,12 @@ export default function App() {
                 </div>
                 <p style={{ margin: '9px 0 0', color: isDarkMode ? '#cbd5e1' : '#64748b', fontSize: '11px', lineHeight: 1.5 }}>
                   {isAlertActive
-                    ? 'Fall detected by the device. No SMS or call service is configured.'
+                    ? demoMode ? 'Simulated demo alert only. No real fall was detected and no message was sent.' : 'Fall detected by the device. No SMS or call service is configured.'
                     : isDeviceConnected
                       ? telemetry?.fallDetected === undefined
                         ? 'Waiting for fall-detection data from the device.'
                         : 'No fall is currently reported. Contact delivery is not configured.'
-                      : 'Connect an ESP32 to receive live fall-detection readings.'}
+                      : demoMode ? 'Demo fall alert cleared. Simulated GPS tracking continues.' : 'Connect an ESP32 to receive live fall-detection readings.'}
                 </p>
               </div>
 
@@ -467,15 +561,29 @@ export default function App() {
           <main style={{ flex: 1, minWidth: 0 }}>
             <section aria-label="Device connection" style={{ background: isDarkMode ? 'rgba(15,23,42,0.92)' : '#ffffff', border: isDarkMode ? '1px solid rgba(148,163,184,0.18)' : '1px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', boxShadow: isDarkMode ? '0 12px 30px rgba(2,6,23,0.25)' : '0 12px 30px rgba(15,23,42,0.03)' }}>
               <div role="status" aria-live="polite" style={{ fontSize: '12px', color: connectionStatus === 'error' ? '#fca5a5' : isDarkMode ? '#cbd5e1' : '#475569', flex: '1 1 240px' }}>
-                <strong style={{ color: isDarkMode ? '#f8fafc' : '#0f172a' }}>{connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting…' : connectionStatus === 'error' ? 'Connection failed' : 'Not connected'}</strong>
-                <div style={{ marginTop: '3px' }}>{connectionError || (isDeviceConnected ? `${connectedDeviceName} · ${telemetry ? 'Receiving live sensor data' : 'Waiting for first sensor reading'}` : 'Press connect and select your ESP32 from the Bluetooth prompt.')}</div>
+                <strong style={{ color: isDarkMode ? '#f8fafc' : '#0f172a' }}>{demoMode ? 'Simulated showcase running' : connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting…' : connectionStatus === 'error' ? 'Connection failed' : 'Not connected'}</strong>
+                <div style={{ marginTop: '3px' }}>{demoMode ? 'Fake GPS and fall-alert data only · no device is connected and no emergency message will be sent.' : connectionError || (isDeviceConnected ? `${connectedDeviceName} · ${telemetry ? 'Receiving live sensor data' : 'Waiting for first sensor reading'}` : 'Press connect and select your ESP32 from the Bluetooth prompt.')}</div>
               </div>
               {isDeviceConnected ? (
                 <button onClick={disconnectFromDevice} style={{ padding: '9px 14px', background: isDarkMode ? '#0f172a' : '#f1f5f9', border: isDarkMode ? '1px solid rgba(148,163,184,0.2)' : '1px solid #cbd5e1', borderRadius: '10px', color: isDarkMode ? '#e2e8f0' : '#334155', fontWeight: 700, cursor: 'pointer' }}>Disconnect</button>
               ) : (
+                <div className="connection-action-group">
+                  {demoMode ? (
+                    <>
+                      <button type="button" onClick={() => setDemoFallAlert(active => !active)} className={demoFallAlert ? 'demo-alert-button demo-alert-button-active' : 'demo-alert-button'}>
+                        {demoFallAlert ? 'Clear demo fall alert' : 'Trigger demo fall alert'}
+                      </button>
+                      <button type="button" onClick={stopDemo} className="stop-demo-button">Stop demo</button>
+                    </>
+                  ) : (
+                    <button type="button" onClick={startDemo} disabled={connectionStatus === 'connecting'} className="start-demo-button">
+                      Start showcase demo
+                    </button>
+                  )}
                 <button onClick={connectToDevice} disabled={connectionStatus === 'connecting'} style={{ padding: '9px 14px', background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', borderRadius: '10px', color: '#ffffff', fontWeight: 700, cursor: connectionStatus === 'connecting' ? 'not-allowed' : 'pointer', opacity: connectionStatus === 'connecting' ? 0.6 : 1 }}>
                   {connectionStatus === 'connecting' ? 'Connecting…' : 'Connect device'}
                 </button>
+                </div>
               )}
             </section>
 
@@ -574,7 +682,7 @@ export default function App() {
                     <div style={{ fontSize: '22px', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: '10px' }}>{coordinates}</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
                       <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: hasGpsFix ? '#10b981' : '#4f46e5' }} />
-                      {isDeviceConnected ? (hasGpsFix ? 'Live ESP32 GPS fix' : 'No GPS fix') : browserLocation ? 'Live browser location' : browserLocationWatching ? 'Waiting for browser location' : 'Location not started'}
+                      {isDeviceConnected ? (hasGpsFix ? 'Live ESP32 GPS fix' : 'No GPS fix') : demoMode ? 'Simulated GPS route' : browserLocation ? 'Live browser location' : browserLocationWatching ? 'Waiting for browser location' : 'Location not started'}
                     </div>
                   </div>
 
@@ -585,25 +693,20 @@ export default function App() {
             {activeTab === 'location' && (
               <div style={{ background: isDarkMode ? 'rgba(15,23,42,0.92)' : '#ffffff', border: isDarkMode ? '1px solid rgba(148,163,184,0.18)' : '1px solid #e2e8f0', borderRadius: '18px', padding: '24px', marginTop: '20px', boxShadow: isDarkMode ? '0 12px 30px rgba(2,6,23,0.2)' : '0 12px 30px rgba(15,23,42,0.03)' }}>
                 <h3 style={{ margin: '0 0 8px 0', fontSize: '20px', fontWeight: 800 }}>Device location</h3>
-                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: isDarkMode ? '#cbd5e1' : '#64748b' }}>{isDeviceConnected ? 'Latest live location reported by the connected ESP32:' : 'Start live browser location or connect an ESP32 GPS module. Browser location requires your permission.'}</p>
-                {!isDeviceConnected && (
+                <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: isDarkMode ? '#cbd5e1' : '#64748b' }}>{demoMode ? 'Simulated showcase only: the marker advances along a sample route in Kuala Lumpur. This is not a real person’s location.' : isDeviceConnected ? 'Live tracking from the connected ESP32 GPS. The map follows each new fix and draws the recent route.' : 'Start browser location tracking or connect an ESP32 GPS module. Browser tracking requires your permission.'}</p>
+                {!isDeviceConnected && !demoMode && (
                   <button type="button" onClick={browserLocationWatching ? stopBrowserLocation : startBrowserLocation} style={{ marginBottom: '12px', padding: '9px 14px', background: browserLocationWatching ? (isDarkMode ? '#0f172a' : '#f1f5f9') : 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: browserLocationWatching ? '1px solid #cbd5e1' : 'none', borderRadius: '10px', color: browserLocationWatching ? (isDarkMode ? '#e2e8f0' : '#334155') : '#ffffff', fontWeight: 700, cursor: 'pointer' }}>
                     {browserLocationWatching ? 'Stop live browser location' : 'Start live browser location'}
                   </button>
                 )}
                 {browserLocationError && <p role="alert" style={{ margin: '0 0 12px 0', color: '#dc2626', fontSize: '12px' }}>{browserLocationError}</p>}
                 {browserLocation && !isDeviceConnected && <p style={{ margin: '0 0 12px 0', fontSize: '12px', color: isDarkMode ? '#cbd5e1' : '#64748b' }}>Accuracy: {Math.round(browserLocation.coords.accuracy)} m · updated {new Date(browserLocation.timestamp).toLocaleTimeString()}</p>}
-                <div style={{ width: '100%', height: '320px', boxSizing: 'border-box', borderRadius: '14px', background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid #c7d2fe', textAlign: 'center', padding: mapEmbedUrl ? 0 : '20px' }}>
-                  {mapEmbedUrl ? (
-                    <iframe className="map-frame" src={mapEmbedUrl} title="Live GPS location" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
-                  ) : (
-                    <>
-                      <div style={{ width: '60px', height: '60px', background: '#4f46e5', color: '#fff', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 10px 25px rgba(79, 70, 229, 0.4)', marginBottom: '12px' }}>🛰️</div>
-                      <h4 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#1e293b' }}>{hasGpsFix ? 'Live location coordinates' : 'Waiting for a live location fix'}</h4>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#4f46e5', fontWeight: 700, fontFamily: 'monospace' }}>{coordinates}</p>
-                      <p style={{ margin: '8px 0 0 0', fontSize: '12px', color: '#64748b' }}>{isDeviceConnected ? (hasGpsFix ? 'Location supplied by live ESP32 telemetry.' : 'Waiting for GPS hardware to get a fix.') : browserLocation ? 'Location supplied by your browser after permission was granted.' : browserLocationError || 'No live location has been requested or received.'}</p>
-                    </>
-                  )}
+                <div className="live-map-frame" role="region" aria-label="Live location map with movement trail">
+                  <LiveLocationMap locations={locationTrail} fallAlertActive={isAlertActive} />
+                </div>
+                <div className="location-map-status" aria-live="polite">
+                  <span>{mapLocation ? `${demoMode ? 'DEMO · SIMULATED' : `Live ${isDeviceConnected ? 'ESP32 GPS' : 'browser'}`} location · ${coordinates}` : isDeviceConnected ? 'Waiting for an ESP32 GPS fix' : locationTrail.length > 0 ? 'Tracking stopped or unavailable · showing the last recorded route' : browserLocationError || 'Waiting for a location fix · start browser tracking or connect an ESP32'}</span>
+                  <span>{locationTrail.length > 0 ? `${locationTrail.length} recent location fixes · up to 500 retained` : 'Movement trail will appear as location updates arrive'}</span>
                 </div>
               </div>
             )}
@@ -614,10 +717,10 @@ export default function App() {
                 <div style={{ padding: '16px', borderRadius: '12px', border: isAlertActive ? '1px solid #fecaca' : '1px solid #e2e8f0', background: isAlertActive ? '#fef2f2' : '#f8fafc', color: isAlertActive ? '#7f1d1d' : '#334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 800, fontSize: '14px' }}>Fall detection</span>
-                    <span style={{ fontSize: '11px', opacity: 0.75, fontWeight: 700 }}>{isDeviceConnected ? 'Device status' : 'Waiting for device data'}</span>
+                    <span style={{ fontSize: '11px', opacity: 0.75, fontWeight: 700 }}>{demoMode ? 'Simulated showcase' : isDeviceConnected ? 'Device status' : 'Waiting for device data'}</span>
                   </div>
                   <p style={{ margin: '6px 0 0 0', fontSize: '12px' }}>
-                    {isAlertActive ? 'Fall state detected. The dashboard warning is active.' : isDeviceConnected ? (telemetry?.fallDetected === undefined ? 'Waiting for fall-detection status from the device.' : 'The device currently reports no fall.') : 'Connect the ESP32 to receive live fall-detection readings.'}
+                    {isAlertActive ? demoMode ? 'Simulated fall state detected. The dashboard warning is active for this showcase only.' : 'Fall state detected. The dashboard warning is active.' : demoMode ? 'The demo fall alert is cleared; simulated GPS movement continues.' : isDeviceConnected ? (telemetry?.fallDetected === undefined ? 'Waiting for fall-detection status from the device.' : 'The device currently reports no fall.') : 'Connect the ESP32 to receive live fall-detection readings.'}
                   </p>
                 </div>
                 <div style={{ marginTop: '12px', padding: '16px', borderRadius: '12px', border: isDeviceConnected && telemetry?.obstacleDetected ? '1px solid #fed7aa' : '1px solid #e2e8f0', background: isDeviceConnected && telemetry?.obstacleDetected ? '#fff7ed' : isDarkMode ? '#0f172a' : '#f8fafc', color: isDarkMode ? '#e2e8f0' : '#334155' }}>
