@@ -1,61 +1,74 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { CircleMarker, MapContainer, Polyline, TileLayer, useMap } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
-export default function GpsTracker() {
-  const [location, setLocation] = useState({ lat: null, lng: null });
-  const [error, setError] = useState(null);
+export interface TrackedLocation {
+  latitude: number
+  longitude: number
+  timestamp: number
+}
+
+function FollowLocation({ location }: { location: TrackedLocation | undefined }) {
+  const map = useMap();
+  const latitude = location?.latitude;
+  const longitude = location?.longitude;
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setError('Geolocation tidak disokong oleh browser anda.');
-      return;
+    if (latitude !== undefined && longitude !== undefined) {
+      map.flyTo([latitude, longitude], Math.max(map.getZoom(), 16), { duration: 0.7 });
     }
+  }, [latitude, longitude, map]);
 
-    const handleSuccess = (position) => {
-      setLocation({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-      });
-      setError(null);
-    };
+  return null;
+}
 
-    const handleError = (err) => {
-      console.error(err);
-      switch(err.code) {
-        case err.PERMISSION_DENIED:
-          setError("User denied the request for Geolocation. Sila benarkan akses lokasi pada browser.");
-          break;
-        case err.POSITION_UNAVAILABLE:
-          setError("Location information is unavailable.");
-          break;
-        case err.TIMEOUT:
-          setError("The request to get user location timed out.");
-          break;
-        default:
-          setError("An unknown error occurred.");
-          break;
-      }
-    };
-
-    // Guna watchPosition supaya dia sentiasa track pergerakan GPS
-    const watcher = navigator.geolocation.watchPosition(handleSuccess, handleError, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
-    });
-
-    return () => navigator.geolocation.clearWatch(watcher);
-  }, []);
+export default function LiveLocationMap({
+  locations,
+  fallAlertActive,
+}: {
+  locations: TrackedLocation[]
+  fallAlertActive: boolean
+}) {
+  const currentLocation = locations.at(-1);
+  const path = locations.map(({ latitude, longitude }) => [latitude, longitude] as [number, number]);
 
   return (
-    <div className="p-4 bg-white rounded-lg shadow-md">
-      <h2 className="text-lg font-bold mb-2">GPS Status</h2>
-      {error ? (
-        <p className="text-red-500 text-sm">Error: {error}</p>
-      ) : (
-        <p className="text-green-600 text-sm">
-          Lat: {location.lat ?? 'Memuatkan...'}, Lng: {location.lng ?? 'Memuatkan...'}
-        </p>
+    <MapContainer
+      className="live-location-map"
+      center={currentLocation ? [currentLocation.latitude, currentLocation.longitude] : [20, 0]}
+      zoom={currentLocation ? 16 : 2}
+      scrollWheelZoom
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      <FollowLocation location={currentLocation} />
+      {path.length > 1 && (
+        <Polyline
+          positions={path}
+          pathOptions={{ color: fallAlertActive ? '#dc2626' : '#4f46e5', weight: 5 }}
+        />
       )}
-    </div>
+      {path.length > 1 && (
+        <CircleMarker
+          center={path[0]}
+          radius={6}
+          pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#4f46e5', fillOpacity: 1 }}
+        />
+      )}
+      {currentLocation && (
+        <CircleMarker
+          center={[currentLocation.latitude, currentLocation.longitude]}
+          radius={9}
+          pathOptions={{
+            color: '#ffffff',
+            weight: 3,
+            fillColor: fallAlertActive ? '#dc2626' : '#059669',
+            fillOpacity: 1,
+          }}
+        />
+      )}
+    </MapContainer>
   );
 }

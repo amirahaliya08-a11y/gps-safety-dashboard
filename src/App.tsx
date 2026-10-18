@@ -176,7 +176,7 @@ export default function App() {
       type: 'obstacle',
       title: 'Obstacle detected · local notification',
       time: timeNow,
-      detail: 'Dashboard notification only. No SMS or emergency contact message was sent.',
+      detail: 'This notification appears on the dashboard only.',
     }, ...prev].slice(0, 4));
   };
 
@@ -350,7 +350,6 @@ export default function App() {
 
   const isDeviceConnected = connectionStatus === 'connected';
   const isAlertActive = (isDeviceConnected && telemetry?.fallDetected === true) || (demoMode && demoFallAlert);
-  const contactAlertStatus = isAlertActive ? 'setup-required' : 'standby';
   const gps = isDeviceConnected
     ? telemetry?.gps
     : demoMode && demoLocation
@@ -418,20 +417,20 @@ export default function App() {
   }, [demoMode]);
 
   useEffect(() => {
-    if (isAlertActive) {
-      if (!previousAlertActiveRef.current) {
-        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setNotifications(prev => [{
-          id: Date.now(),
-          type: 'alert',
-          title: demoMode ? 'Demo fall alert · simulated only' : 'Fall detected · message not sent',
-          time: timeNow,
-          detail: demoMode ? 'Showcase data only. No real fall was detected and no message was sent.' : 'No SMS or call service is configured; no message was sent.',
-        }, ...prev].slice(0, 4));
-      }
+    if (isAlertActive && !previousAlertActiveRef.current) {
+      const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setNotifications(prev => [{
+        id: Date.now(),
+        type: 'alert',
+        title: demoMode ? 'Demo fall alert · simulated only' : 'Fall detected · local dashboard alert',
+        time: timeNow,
+        detail: demoMode
+          ? 'Showcase data only. No real fall was detected.'
+          : 'Fall alert reported by the connected device. This notification appears on the dashboard only.',
+      }, ...prev].slice(0, 4));
     }
     previousAlertActiveRef.current = isAlertActive;
-  }, [isAlertActive, isDeviceConnected, demoMode]);
+  }, [isAlertActive, demoMode]);
 
   const tabs: { id: typeof activeTab; label: string; icon: string; badge?: string | null }[] = [
     { id: 'overview', label: 'Overview', icon: '🏠' },
@@ -539,27 +538,19 @@ export default function App() {
                 </div>
                 <p style={{ margin: '9px 0 0', color: isDarkMode ? '#cbd5e1' : '#64748b', fontSize: '11px', lineHeight: 1.5 }}>
                   {isAlertActive
-                    ? demoMode ? 'Simulated demo alert only. No real fall was detected and no message was sent.' : 'Fall detected by the device. No SMS or call service is configured.'
+                    ? demoMode ? 'Simulated demo alert only. No real fall was detected.' : 'Fall detected by the device. The alert is shown on this dashboard.'
                     : isDeviceConnected
                       ? telemetry?.fallDetected === undefined
                         ? 'Waiting for fall-detection data from the device.'
-                        : 'No fall is currently reported. Contact delivery is not configured.'
+                        : 'No fall is currently reported.'
                       : demoMode ? 'Demo fall alert cleared. Simulated GPS tracking continues.' : 'Connect an ESP32 to receive live fall-detection readings.'}
                 </p>
               </div>
 
               <div style={{ background: isDarkMode ? '#0f172a' : '#f8fafc', border: isDarkMode ? '1px solid rgba(148,163,184,0.12)' : '1px solid #e2e8f0', borderRadius: '14px', padding: '12px' }}>
-                <div style={{ fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>Emergency contacts</div>
-                <div style={{ display: 'grid', gap: '8px', marginTop: '10px' }}>
-                  {['Primary contact', 'Backup contact'].map(contact => (
-                    <div key={contact} style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', padding: '8px 10px', borderRadius: '10px', background: isDarkMode ? '#111827' : '#ffffff', border: isDarkMode ? '1px solid rgba(148,163,184,0.12)' : '1px solid #e5e7eb', fontSize: '11px' }}>
-                      <span style={{ fontWeight: 700 }}>{contact}</span>
-                      <span style={{ color: isDarkMode ? '#cbd5e1' : '#64748b' }}>Not configured</span>
-                    </div>
-                  ))}
-                </div>
+                <div style={{ fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 800 }}>Dashboard notifications</div>
                 <div style={{ marginTop: '10px', fontSize: '11px', color: isDarkMode ? '#cbd5e1' : '#64748b', lineHeight: 1.5 }}>
-                  No contact or SMS/call service is configured. Alerts stay on this dashboard.
+                  Fall and obstacle alerts appear here while the dashboard is open.
                 </div>
               </div>
             </div>
@@ -569,7 +560,7 @@ export default function App() {
             <section aria-label="Device connection" style={{ background: isDarkMode ? 'rgba(15,23,42,0.92)' : '#ffffff', border: isDarkMode ? '1px solid rgba(148,163,184,0.18)' : '1px solid #e2e8f0', borderRadius: '18px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', boxShadow: isDarkMode ? '0 12px 30px rgba(2,6,23,0.25)' : '0 12px 30px rgba(15,23,42,0.03)' }}>
               <div role="status" aria-live="polite" style={{ fontSize: '12px', color: connectionStatus === 'error' ? '#fca5a5' : isDarkMode ? '#cbd5e1' : '#475569', flex: '1 1 240px' }}>
                 <strong style={{ color: isDarkMode ? '#f8fafc' : '#0f172a' }}>{demoMode ? 'Simulated showcase running' : connectionStatus === 'connected' ? 'Connected' : connectionStatus === 'connecting' ? 'Connecting…' : connectionStatus === 'error' ? 'Connection failed' : 'Not connected'}</strong>
-                <div style={{ marginTop: '3px' }}>{demoMode ? 'Fake GPS and fall-alert data only · no device is connected and no emergency message will be sent.' : connectionError || (isDeviceConnected ? `${connectedDeviceName} · ${telemetry ? 'Receiving live sensor data' : 'Waiting for first sensor reading'}` : 'Press connect and select your ESP32 from the Bluetooth prompt.')}</div>
+                <div style={{ marginTop: '3px' }}>{demoMode ? 'Simulated GPS and fall-alert data only · no device is connected.' : connectionError || (isDeviceConnected ? `${connectedDeviceName} · ${telemetry ? 'Receiving live sensor data' : 'Waiting for first sensor reading'}` : 'Press connect and select your ESP32 from the Bluetooth prompt.')}</div>
               </div>
               {isDeviceConnected ? (
                 <button onClick={disconnectFromDevice} style={{ padding: '9px 14px', background: isDarkMode ? '#0f172a' : '#f1f5f9', border: isDarkMode ? '1px solid rgba(148,163,184,0.2)' : '1px solid #cbd5e1', borderRadius: '10px', color: isDarkMode ? '#e2e8f0' : '#334155', fontWeight: 700, cursor: 'pointer' }}>Disconnect</button>
@@ -650,7 +641,7 @@ export default function App() {
                           </div>
                         )) : (
                           <div style={{ padding: '8px 10px', fontSize: '11px', lineHeight: 1.5, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
-                            No alerts yet. Local dashboard notifications are ready; emergency contact delivery requires a configured service.
+                            No alerts yet. Fall and obstacle notifications will appear here.
                           </div>
                         )}
                       </div>
@@ -691,6 +682,15 @@ export default function App() {
                       <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: hasGpsFix ? '#10b981' : '#4f46e5' }} />
                       {isDeviceConnected ? (hasGpsFix ? 'Live ESP32 GPS fix' : 'No GPS fix') : demoMode ? 'Simulated GPS route' : browserLocation ? 'Live browser location' : browserLocationWatching ? 'Waiting for browser location' : 'Location not started'}
                     </div>
+                    {mapLocation ? (
+                      <div style={{ marginTop: '14px', height: '190px', overflow: 'hidden', border: '1px solid #cbd5e1', borderRadius: '12px' }}>
+                        <LiveLocationMap locations={locationTrail} fallAlertActive={isAlertActive} />
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '14px', fontSize: '12px', color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                        The map will appear when a GPS fix is received.
+                      </div>
+                    )}
                   </div>
 
                 </div>
@@ -739,7 +739,7 @@ export default function App() {
                   </div>
                   <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.6, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
                     {isDeviceConnected && telemetry?.obstacleDetected
-                      ? 'An in-dashboard notification was created. No SMS or emergency contact message was sent.'
+                      ? 'An in-dashboard notification was created.'
                       : isDeviceConnected && telemetry?.obstacleDetected === false
                         ? 'The connected device reports no obstacle. A new detection will create another local notification.'
                         : 'Waiting for obstacleDetected status from the connected ESP32.'}
@@ -747,15 +747,15 @@ export default function App() {
                 </div>
                 <div style={{ marginTop: '12px', padding: '16px', borderRadius: '12px', border: isAlertActive ? '1px solid #fed7aa' : '1px solid #e2e8f0', background: isAlertActive ? '#fff7ed' : isDarkMode ? '#0f172a' : '#f8fafc', color: isDarkMode ? '#e2e8f0' : '#334155' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 800, fontSize: '14px' }}>Emergency contact notification</span>
-                    <span style={{ fontSize: '11px', fontWeight: 800, color: contactAlertStatus === 'setup-required' ? '#b91c1c' : '#64748b' }}>
-                      {contactAlertStatus === 'setup-required' ? 'NOT SENT · SERVICE REQUIRED' : 'NOT CONFIGURED'}
+                    <span style={{ fontWeight: 800, fontSize: '14px' }}>Fall notification</span>
+                    <span style={{ fontSize: '11px', fontWeight: 800, color: isAlertActive ? '#b91c1c' : '#64748b' }}>
+                      {isAlertActive ? 'DASHBOARD ALERT' : 'LOCAL ONLY'}
                     </span>
                   </div>
                   <p style={{ margin: '6px 0 0', fontSize: '12px', lineHeight: 1.6, color: isDarkMode ? '#cbd5e1' : '#64748b' }}>
-                    {contactAlertStatus === 'setup-required'
-                        ? 'The connected device reported a fall, but no SMS or call was sent. Connect a backend notification service to deliver alerts to the emergency contact.'
-                        : 'No recipient or message-delivery service is configured. Alerts appear on this dashboard only; no SMS or call will be sent.'}
+                    {isAlertActive
+                      ? 'A fall has been detected. The alert is visible in this dashboard only.'
+                      : 'Fall alerts appear in this dashboard when reported by the connected device.'}
                   </p>
                 </div>
               </div>
